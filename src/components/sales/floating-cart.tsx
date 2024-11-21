@@ -1,7 +1,7 @@
 import { X, Trash2, Plus, Minus, FileText, MessageSquare } from 'lucide-react';
 import { useCart } from '../../hooks/use-cart';
 import { useCustomer } from '../../hooks/use-customer';
-import { products } from '../../data/products';
+import { useProducts } from '../../hooks/use-products';
 import { formatCurrency } from '../../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useApprovals } from '../../hooks/use-approvals';
@@ -19,6 +19,7 @@ export function FloatingCart({ onClose }: FloatingCartProps) {
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, removeItem, discount, setDiscount, orderNote, setOrderNote, getTotal, clearCart, setItemNote } = useCart();
   const { selectedCustomer, setSelectedCustomer } = useCustomer();
+  const { getProduct } = useProducts();
   const { addApproval } = useApprovals();
   const { addTransaction } = useTransactions();
   const { user } = useAuth();
@@ -40,7 +41,7 @@ export function FloatingCart({ onClose }: FloatingCartProps) {
         phone: selectedCustomer.phone,
       },
       items: cartItems.map(item => {
-        const product = products.find(p => p.id === item.productId);
+        const product = getProduct(item.productId);
         return {
           productId: item.productId,
           name: product?.name || '',
@@ -112,7 +113,7 @@ export function FloatingCart({ onClose }: FloatingCartProps) {
             ) : (
               <div className="space-y-4">
                 {cartItems.map((item) => {
-                  const product = products.find(p => p.id === item.productId);
+                  const product = getProduct(item.productId);
                   if (!product) return null;
 
                   return (

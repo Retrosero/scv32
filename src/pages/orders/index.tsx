@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Search, Calendar, Eye, Printer, FileSpreadsheet } from 'lucide-react';
+import { Search, Calendar, Eye, Printer, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useOrders, OrderStatus } from '../../hooks/use-orders';
 import { formatCurrency } from '../../lib/utils';
 import { cn } from '../../lib/utils';
+import * as XLSX from 'xlsx';
 
 const tabs: { id: OrderStatus; label: string }[] = [
   { id: 'preparing', label: 'Hazırlanacak' },
@@ -19,6 +20,7 @@ export function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const { getOrdersByStatus, getStatusCounts } = useOrders();
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   const activeTab = (searchParams.get('status') as OrderStatus) || 'preparing';
   const statusCounts = getStatusCounts();
@@ -32,7 +34,37 @@ export function OrdersPage() {
   });
 
   const handleExport = () => {
-    // Excel export functionality
+    const data = orders.map(order => ({
+      'Sipariş No': order.id,
+      'Tarih': new Date(order.date).toLocaleString('tr-TR'),
+      'Müşteri': order.customer.name,
+      'Adres': order.customer.address,
+      'Telefon': order.customer.phone,
+      'Tutar': formatCurrency(order.totalAmount),
+      'Durum': order.status === 'preparing' ? 'Hazırlanıyor' :
+               order.status === 'checking' ? 'Kontrol Ediliyor' :
+               order.status === 'loading' ? 'Yükleniyor' :
+               order.status === 'ready' ? 'Teslime Hazır' :
+               'Teslim Edildi'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Siparişler');
+    XLSX.writeFile(wb, `siparisler-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (!tabsRef.current) return;
+    
+    const scrollAmount = 200;
+    const container = tabsRef.current;
+    
+    if (direction === 'left') {
+      container.scrollLeft -= scrollAmount;
+    } else {
+      container.scrollLeft += scrollAmount;
+    }
   };
 
   return (
@@ -48,26 +80,48 @@ export function OrdersPage() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => navigate(`/orders?status=${tab.id}`)}
-            className={cn(
-              'px-4 py-2 rounded-lg relative',
-              activeTab === tab.id
-                ? 'bg-primary-600 text-white'
-                : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
-            )}
-          >
-            {tab.label}
-            {statusCounts[tab.id] > 0 && (
-              <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {statusCounts[tab.id]}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 mb-6 relative">
+        <button
+          onClick={() => handleScroll('left')}
+          className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm z-10"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        <div 
+          ref={tabsRef}
+          className="flex-1 overflow-x-auto scrollbar-hide"
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          <div className="flex gap-2 min-w-max px-2 py-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => navigate(`/orders?status=${tab.id}`)}
+                className={cn(
+                  'px-4 py-2 rounded-lg relative whitespace-nowrap min-w-[120px]',
+                  activeTab === tab.id
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+                )}
+              >
+                {tab.label}
+                {statusCounts[tab.id] > 0 && (
+                  <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center z-20">
+                    {statusCounts[tab.id]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={() => handleScroll('right')}
+          className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm z-10"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
       </div>
 
       <div className="flex gap-4 mb-6">
@@ -116,6 +170,11 @@ export function OrdersPage() {
                      order.status === 'ready' ? 'Teslime Hazır' :
                      'Teslim Edildi'}
                   </span>
+                  {order.pendingApproval && (
+                    <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded-full">
+                      Onay Bekliyor
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-gray-500">
                   {new Date(order.date).toLocaleString('tr-TR')}
@@ -137,7 +196,6 @@ export function OrdersPage() {
                     {order.status === 'preparing' ? 'Hazırla' :
                      order.status === 'checking' ? 'Kontrol Et' :
                      order.status === 'loading' ? 'Yükle' :
-                     order.status === 'ready' ? 'Teslim Et' :
                      'Görüntüle'}
                   </span>
                 </button>

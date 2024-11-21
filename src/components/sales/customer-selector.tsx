@@ -2,6 +2,8 @@ import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { customers } from '../../data/customers';
 import { useNavigate } from 'react-router-dom';
+import { useTransactions } from '../../hooks/use-transactions';
+import { formatCurrency } from '../../lib/utils';
 
 interface CustomerSelectorProps {
   onSelect: (customer: typeof customers[0]) => void;
@@ -10,6 +12,7 @@ interface CustomerSelectorProps {
 export function CustomerSelector({ onSelect }: CustomerSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const { getCustomerBalance } = useTransactions();
 
   const filteredCustomers = customers.filter(
     (customer) =>
@@ -42,19 +45,23 @@ export function CustomerSelector({ onSelect }: CustomerSelectorProps) {
         </div>
 
         <div className="max-h-[60vh] overflow-auto mt-3">
-          {filteredCustomers.map((customer) => (
-            <button
-              key={customer.id}
-              onClick={() => onSelect(customer)}
-              className="w-full text-left p-2 rounded-lg mb-1 sm:mb-2 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <div className="font-medium text-gray-900 dark:text-gray-100">{customer.name}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                VN: {customer.taxNumber} - Bakiye: ₺{customer.balance}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">{customer.address}</div>
-            </button>
-          ))}
+          {filteredCustomers.map((customer) => {
+            const balance = getCustomerBalance(customer.id);
+            
+            return (
+              <button
+                key={customer.id}
+                onClick={() => onSelect(customer)}
+                className="w-full text-left p-2 rounded-lg mb-1 sm:mb-2 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <div className="font-medium text-gray-900 dark:text-gray-100">{customer.name}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  VN: {customer.taxNumber} - Bakiye: {formatCurrency(balance)}
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">{customer.address}</div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

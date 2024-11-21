@@ -133,7 +133,6 @@ export function ReturnsPage() {
 
   const handleSelectProduct = (product: PurchasedProduct, purchase: Purchase) => {
     handleQuantityChange(product.productId, purchase.transactionId, 1);
-    setShowHistoryPopup(null);
   };
 
   const handleComplete = () => {
@@ -198,6 +197,8 @@ export function ReturnsPage() {
     }
   };
 
+  const total = selectedProducts.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
   if (!selectedCustomer) {
     return <CustomerSelector onSelect={setSelectedCustomer} />;
   }
@@ -223,118 +224,6 @@ export function ReturnsPage() {
           />
         </div>
       </div>
-
-      {/* Seçilen Ürünler Listesi */}
-      {selectedProducts.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-medium mb-4">İade Edilecek Ürünler</h2>
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left p-4">Ürün</th>
-                    <th className="text-left p-4">Alış Tarihi</th>
-                    <th className="text-right p-4">Birim Fiyat</th>
-                    <th className="text-right p-4">Miktar</th>
-                    <th className="text-right p-4">Toplam</th>
-                    <th className="text-center p-4">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedProducts.map((selected) => {
-                    const product = purchasedProducts.find(p => p.productId === selected.productId);
-                    const purchase = product?.purchases.find(p => p.transactionId === selected.transactionId);
-                    
-                    if (!product || !purchase) return null;
-
-                    return (
-                      <tr key={`${selected.productId}-${selected.transactionId}`} className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className="w-12 h-12 object-cover rounded"
-                            />
-                            <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-gray-500">Kod: {product.productId}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          {new Date(purchase.date).toLocaleDateString('tr-TR')}
-                        </td>
-                        <td className="p-4 text-right">
-                          {formatCurrency(selected.price)}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleQuantityChange(
-                                selected.productId,
-                                selected.transactionId,
-                                selected.quantity - 1
-                              )}
-                              className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-                            >
-                              <Minus className="w-4 h-4" />
-                            </button>
-                            <span className="w-8 text-center">{selected.quantity}</span>
-                            <button
-                              onClick={() => handleQuantityChange(
-                                selected.productId,
-                                selected.transactionId,
-                                selected.quantity + 1
-                              )}
-                              className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-                              disabled={selected.quantity >= purchase.quantity}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="p-4 text-right">
-                          {formatCurrency(selected.price * selected.quantity)}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-center">
-                            <button
-                              onClick={() => handleQuantityChange(
-                                selected.productId,
-                                selected.transactionId,
-                                0
-                              )}
-                              className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="font-bold">
-                    <td colSpan={4} className="p-4 text-right">Toplam İade Tutarı:</td>
-                    <td className="p-4 text-right">
-                      {formatCurrency(
-                        selectedProducts.reduce(
-                          (sum, { price, quantity }) => sum + price * quantity,
-                          0
-                        )
-                      )}
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Ürün Grid'i */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-20">
@@ -383,14 +272,9 @@ export function ReturnsPage() {
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
           <div className="container mx-auto flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Toplam İade Tutarı</p>
+              <p className="text-sm text-gray-500">İade Tutarı</p>
               <p className="text-2xl font-bold">
-                {formatCurrency(
-                  selectedProducts.reduce(
-                    (sum, { price, quantity }) => sum + price * quantity,
-                    0
-                  )
-                )}
+                {formatCurrency(total)}
               </p>
             </div>
             <div className="flex gap-4">

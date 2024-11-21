@@ -57,7 +57,7 @@ export const useApprovals = create<ApprovalsState>()(
             // Handle approval based on type
             if (status === 'approved' && !approval.processed) {
               const { addTransaction, deleteTransaction } = useTransactions.getState();
-              const { addOrder } = useOrders.getState();
+              const { updateOrder, setOrderPendingApproval } = useOrders.getState();
 
               switch (approval.type) {
                 case 'sale':
@@ -73,6 +73,7 @@ export const useApprovals = create<ApprovalsState>()(
                   });
 
                   // Create order in preparing status
+                  const { addOrder } = useOrders.getState();
                   addOrder({
                     status: 'preparing',
                     customer: approval.newData.customer,
@@ -88,8 +89,65 @@ export const useApprovals = create<ApprovalsState>()(
                   });
                   break;
 
+                case 'payment':
+                  // Add payment transaction
+                  addTransaction({
+                    type: 'payment',
+                    description: 'Tahsilat',
+                    customer: approval.newData.customer,
+                    amount: approval.newData.total,
+                    paymentMethod: approval.newData.payments.map((p: any) => {
+                      switch (p.type) {
+                        case 'nakit': return 'Nakit';
+                        case 'krediKarti': return `Kredi Kartı (${p.data.bank})`;
+                        case 'cek': return `Çek (${p.data.bank} - ${p.data.checkNumber})`;
+                        case 'senet': return `Senet (${p.data.bondNumber})`;
+                        case 'havale': return `Havale (${p.data.bank})`;
+                        default: return p.type;
+                      }
+                    }).join(', '),
+                    note: approval.newData.note,
+                    date: new Date().toISOString(),
+                  });
+                  break;
+
+                case 'expense':
+                  // Add expense transaction
+                  addTransaction({
+                    type: 'expense',
+                    description: 'Tediye',
+                    customer: approval.newData.customer,
+                    amount: -approval.newData.total,
+                    paymentMethod: approval.newData.payments.map((p: any) => {
+                      switch (p.type) {
+                        case 'nakit': return 'Nakit';
+                        case 'krediKarti': return `Kredi Kartı (${p.data.bank})`;
+                        case 'cek': return `Çek (${p.data.bank} - ${p.data.checkNumber})`;
+                        case 'senet': return `Senet (${p.data.bondNumber})`;
+                        case 'havale': return `Havale (${p.data.bank})`;
+                        default: return p.type;
+                      }
+                    }).join(', '),
+                    note: approval.newData.note,
+                    date: new Date().toISOString(),
+                  });
+                  break;
+
+                case 'return':
+                  // Add return transaction
+                  addTransaction({
+                    type: 'return',
+                    description: 'İade',
+                    customer: approval.newData.customer,
+                    amount: approval.newData.total,
+                    items: approval.newData.items,
+                    note: approval.newData.note,
+                    date: new Date().toISOString(),
+                  });
+                  break;
+
                 case 'order_change':
-                  // Delete old transaction
+                  // Delete old transaction if exists
                   if (approval.oldData.transactionId) {
                     deleteTransaction(approval.oldData.transactionId);
                   }
@@ -105,16 +163,19 @@ export const useApprovals = create<ApprovalsState>()(
                     date: new Date().toISOString(),
                   });
 
-                  // Update order status to loading
-                  const { updateOrder } = useOrders.getState();
-                  updateOrder(approval.newData.id, {
-                    items: approval.newData.items,
-                    totalAmount: approval.newData.totalAmount,
-                    status: 'loading'
-                  });
-                  break;
+                  // Update order with new quantities
+                  const updatedOrder = {
+                    ...approval.newData,
+                    status: approval.oldData.status, // Preserve original status
+                    routeId: approval.oldData.routeId, // Preserve route info
+                    routeName: approval.oldData.routeName,
+                    routeOrder: approval.oldData.routeOrder,
+                    routeDate: approval.oldData.routeDate,
+                    pendingApproval: false
+                  };
 
-                // Handle other approval types...
+                  updateOrder(approval.newData.id, updatedOrder);
+                  break;
               }
             }
 

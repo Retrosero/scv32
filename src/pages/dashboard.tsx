@@ -54,7 +54,7 @@ const metrics = [
 ];
 
 const menuCards = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+  { id: 'dashboard', label: 'Ana Sayfa', icon: LayoutDashboard, path: '/dashboard' },
   { id: 'customers', label: 'Müşteriler', icon: Users, path: '/customers' },
   { id: 'sales', label: 'Satış', icon: ShoppingCart, path: '/sales' },
   { id: 'products', label: 'Ürünler', icon: Package, path: '/products' },
@@ -81,8 +81,6 @@ export function DashboardPage() {
   if (dashboardLayout === 'metrics') {
     return (
       <div className="p-2 sm:p-4">
-        <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-        
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           {visibleMetrics.map((metric) => {
             const Icon = metric.icon;
@@ -120,8 +118,6 @@ export function DashboardPage() {
 
   return (
     <div className="p-2 sm:p-4">
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-      
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
         {orderedMenuCards.map((card) => {
           const Icon = card.icon;

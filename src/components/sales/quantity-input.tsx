@@ -26,7 +26,10 @@ export function QuantityInput({ value, onChange, min = 0, max }: QuantityInputPr
       <input
         type="number"
         value={value}
-        onChange={(e) => handleChange(parseInt(e.target.value) || min)}
+        onChange={(e) => {
+          const newValue = parseInt(e.target.value) || min;
+          handleChange(newValue);
+        }}
         className="w-12 sm:w-16 px-2 h-8 mx-1 text-center rounded border border-gray-200 dark:border-gray-700"
         min={min}
         max={max}

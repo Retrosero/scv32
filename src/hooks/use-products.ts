@@ -18,19 +18,45 @@ export type Product = {
 
 type ProductsState = {
   products: Product[];
-  updateProduct: (product: Product) => void;
+  updateProduct: (productId: string, action: 'update' | 'increaseStock' | 'decreaseStock', payload: any) => void;
+  getProduct: (productId: string) => Product | undefined;
 };
 
 export const useProducts = create<ProductsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       products: initialProducts,
-      updateProduct: (updatedProduct) => {
+      
+      updateProduct: (productId, action, payload) => {
+        console.log('Updating product:', productId, action, payload); // Debug log
+        
         set((state) => ({
-          products: state.products.map((product) =>
-            product.id === updatedProduct.id ? updatedProduct : product
-          ),
+          products: state.products.map((product) => {
+            if (product.id !== productId) return product;
+
+            let updatedProduct;
+            switch (action) {
+              case 'update':
+                updatedProduct = { ...product, ...payload };
+                break;
+              case 'increaseStock':
+                updatedProduct = { ...product, stock: product.stock + payload };
+                break;
+              case 'decreaseStock':
+                updatedProduct = { ...product, stock: Math.max(0, product.stock - payload) };
+                break;
+              default:
+                return product;
+            }
+            
+            console.log('Product updated:', updatedProduct); // Debug log
+            return updatedProduct;
+          }),
         }));
+      },
+
+      getProduct: (productId) => {
+        return get().products.find(p => p.id === productId);
       },
     }),
     {

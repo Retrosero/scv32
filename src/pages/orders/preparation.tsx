@@ -2,17 +2,20 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrders } from '../../hooks/use-orders';
 import { useAuth } from '../../hooks/use-auth';
-import { Plus, Minus, Check } from 'lucide-react';
+import { useApprovals } from '../../hooks/use-approvals';
+import { Plus, Minus, Check, AlertTriangle, Truck } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { formatCurrency } from '../../lib/utils';
 
-function QuantityInput({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+function QuantityInput({ value, onChange, disabled }: { value: number; onChange: (value: number) => void; disabled?: boolean }) {
   return (
     <div className="flex items-center gap-2">
       <button
         onClick={() => onChange(Math.max(0, value - 1))}
         className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+        disabled={disabled}
       >
-        <Minus className="w-5 h-5" />
+        <Minus className="w-4 h-4" />
       </button>
       <input
         type="number"
@@ -20,12 +23,14 @@ function QuantityInput({ value, onChange }: { value: number; onChange: (value: n
         onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
         className="w-16 px-2 py-1 text-center rounded-lg border border-gray-200 dark:border-gray-700"
         min="0"
+        disabled={disabled}
       />
       <button
         onClick={() => onChange(value + 1)}
         className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+        disabled={disabled}
       >
-        <Plus className="w-5 h-5" />
+        <Plus className="w-4 h-4" />
       </button>
     </div>
   );
@@ -35,12 +40,14 @@ export function OrderPreparationPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getOrderById, updateOrder, updateOrderItem } = useOrders();
+  const { getOrderById, updateOrder, updateOrderItem, setOrderPendingApproval } = useOrders();
+  const { addApproval } = useApprovals();
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const order = getOrderById(id!);
   if (!order) return null;
 
-  const canEditQuantity = order.status === 'preparing' || order.status === 'checking' || order.status === 'loading';
+  const canEditQuantity = order.status === 'preparing' || order.status === 'checking';
 
   const getItemStatus = (item: any) => {
     const collectedQty = item.collectedQuantity || 0;
@@ -53,11 +60,53 @@ export function OrderPreparationPage() {
   const handleComplete = () => {
     if (!order) return;
 
+    // Check if any quantities are different from requested
+    const hasQuantityChanges = order.items.some(item => 
+      (item.collectedQuantity || 0) !== item.quantity
+    );
+
+    if (hasQuantityChanges && order.status !== 'loading') {
+      // Create approval request
+      const approvalData = {
+        id: order.id,
+        customer: order.customer,
+        items: order.items.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: item.collectedQuantity || 0,
+          price: item.price,
+          image: item.image,
+        })),
+        totalAmount: order.items.reduce((sum, item) => 
+          sum + (item.price * (item.collectedQuantity || 0)), 0
+        ),
+      };
+
+      addApproval({
+        type: 'order_change',
+        user: user?.name || 'Unknown User',
+        oldData: order,
+        newData: approvalData,
+        description: `${order.customer.name} - Sipariş Güncelleme`,
+        amount: approvalData.totalAmount,
+        customer: order.customer,
+      });
+
+      // Mark order as pending approval
+      setOrderPendingApproval(order.id, true);
+      navigate('/orders?status=preparing');
+      return;
+    }
+
+    if (order.status === 'loading') {
+      setShowConfirmation(true);
+      return;
+    }
+
     const nextStatus = 
       order.status === 'preparing' ? 'checking' :
       order.status === 'checking' ? 'loading' :
       order.status === 'loading' ? 'ready' :
-      order.status === 'ready' ? 'delivered' :
       order.status;
 
     const updates: any = {
@@ -73,9 +122,6 @@ export function OrderPreparationPage() {
     } else if (order.status === 'loading') {
       updates.loadedBy = user?.name;
       updates.loadingEndDate = new Date().toISOString();
-    } else if (order.status === 'ready') {
-      updates.deliveredBy = user?.name;
-      updates.deliveryDate = new Date().toISOString();
     }
 
     updateOrder(order.id, updates);
@@ -103,18 +149,32 @@ export function OrderPreparationPage() {
                  order.status === 'ready' ? 'Teslime Hazır' :
                  'Teslim Edildi'}
               </span>
+              {order.pendingApproval && (
+                <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded-full">
+                  Onay Bekliyor
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-500">
               {new Date(order.date).toLocaleString('tr-TR')}
             </p>
           </div>
-          {canEditQuantity && (
+          {canEditQuantity && !order.pendingApproval && (
             <button
               onClick={handleComplete}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
               <Check className="w-5 h-5" />
               <span>Tamamla</span>
+            </button>
+          )}
+          {order.status === 'loading' && !order.pendingApproval && (
+            <button
+              onClick={handleComplete}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            >
+              <Truck className="w-5 h-5" />
+              <span>Araca Yükle</span>
             </button>
           )}
         </div>
@@ -162,7 +222,7 @@ export function OrderPreparationPage() {
                     </p>
                   )}
                 </div>
-                {canEditQuantity && (
+                {canEditQuantity && !order.pendingApproval && (
                   <QuantityInput
                     value={item.collectedQuantity || 0}
                     onChange={(newValue) => {
@@ -177,6 +237,37 @@ export function OrderPreparationPage() {
           );
         })}
       </div>
+
+      {showConfirmation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium mb-4">Onay</h3>
+            <p className="mb-6">Siparişi araca yüklemek istediğinizden emin misiniz?</p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowConfirmation(false)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmation(false);
+                  updateOrder(order.id, {
+                    status: 'ready',
+                    loadedBy: user?.name,
+                    loadingEndDate: new Date().toISOString(),
+                  });
+                  navigate('/orders?status=ready');
+                }}
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                Evet, Yükle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

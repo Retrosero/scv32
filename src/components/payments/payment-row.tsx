@@ -3,7 +3,7 @@ import { cn } from '../../lib/utils';
 import { useState } from 'react';
 
 type PaymentRowProps = {
-  type: 'nakit' | 'cek' | 'senet' | 'krediKarti';
+  type: 'nakit' | 'cek' | 'senet' | 'krediKarti' | 'havale';
   onDelete: () => void;
   onChange: (data: any) => void;
   data: any;
@@ -61,6 +61,7 @@ export function PaymentRow({ type, onDelete, onChange, data }: PaymentRowProps) 
         );
 
       case 'krediKarti':
+      case 'havale':
         return (
           <div className="flex gap-2">
             <input

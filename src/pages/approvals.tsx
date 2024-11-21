@@ -1,24 +1,27 @@
-import { useState } from 'react';
-import { Search, Check, X } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Search, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApprovals, ApprovalStatus, ApprovalType } from '../hooks/use-approvals';
 import { formatCurrency } from '../lib/utils';
 import { cn } from '../lib/utils';
+import { ApprovalDetail } from '../components/approvals/approval-detail';
 
 type TabType = 'all' | 'sales' | 'payments' | 'expenses' | 'returns' | 'products' | 'orders';
 
 export function ApprovalsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<ApprovalStatus>('pending');
   const { approvals, updateApprovalStatus } = useApprovals();
+  const tabsRef = useRef<HTMLDivElement>(null);
 
-  const tabs: TabType[] = [
-    'all',
-    'sales',
-    'payments',
-    'expenses',
-    'returns',
-    'products',
-    'orders'
+  const tabs: { id: TabType; label: string }[] = [
+    { id: 'all', label: 'Tümü' },
+    { id: 'sales', label: 'Satışlar' },
+    { id: 'payments', label: 'Tahsilatlar' },
+    { id: 'expenses', label: 'Tediyeler' },
+    { id: 'returns', label: 'İadeler' },
+    { id: 'products', label: 'Ürün Değişiklikleri' },
+    { id: 'orders', label: 'Siparişler' },
   ];
 
   const pendingCounts = {
@@ -33,141 +36,31 @@ export function ApprovalsPage() {
 
   const filteredApprovals = approvals
     .filter(approval => 
-      activeTab === 'all' || approval.type === activeTab
+      activeTab === 'all' || 
+      (activeTab === 'sales' && approval.type === 'sale') ||
+      (activeTab === 'payments' && approval.type === 'payment') ||
+      (activeTab === 'expenses' && approval.type === 'expense') ||
+      (activeTab === 'returns' && approval.type === 'return') ||
+      (activeTab === 'products' && approval.type === 'product') ||
+      (activeTab === 'orders' && approval.type === 'order_change')
     )
+    .filter(approval => approval.status === selectedStatus)
     .filter(approval =>
       !searchQuery ||
       approval.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       approval.customer?.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-  const renderApprovalDetail = (approval: any) => {
-    switch (approval.type) {
-      case 'sale':
-        return (
-          <div id="approval-detail" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h3 className="font-medium mb-2">Müşteri Bilgileri</h3>
-                <p>{approval.newData.customer.name}</p>
-                <p className="text-sm text-gray-500">{approval.newData.customer.address}</p>
-                <p className="text-sm text-gray-500">Tel: {approval.newData.customer.phone}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Tarih</p>
-                <p>{new Date(approval.date).toLocaleDateString('tr-TR')}</p>
-              </div>
-            </div>
-
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left">Ürün</th>
-                  <th className="text-right">Birim Fiyat</th>
-                  <th className="text-right">Miktar</th>
-                  <th className="text-right">Toplam</th>
-                </tr>
-              </thead>
-              <tbody>
-                {approval.newData.items.map((item: any, index: number) => (
-                  <tr key={index} className="border-b">
-                    <td>{item.name}</td>
-                    <td className="text-right">{formatCurrency(item.price)}</td>
-                    <td className="text-right">{item.quantity}</td>
-                    <td className="text-right">{formatCurrency(item.price * item.quantity)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                {approval.newData.discount > 0 && (
-                  <tr className="text-green-600">
-                    <td colSpan={3} className="text-right">İskonto ({approval.newData.discount}%)</td>
-                    <td className="text-right">
-                      -{formatCurrency(approval.newData.total * (approval.newData.discount / 100))}
-                    </td>
-                  </tr>
-                )}
-                <tr className="font-bold">
-                  <td colSpan={3} className="text-right">Toplam</td>
-                  <td className="text-right">{formatCurrency(approval.newData.total)}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {approval.newData.note && (
-              <div>
-                <h3 className="font-medium mb-2">Not</h3>
-                <p className="text-sm text-gray-500">{approval.newData.note}</p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'order_change':
-        return (
-          <div id="approval-detail" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h3 className="font-medium mb-2">Müşteri Bilgileri</h3>
-                <p>{approval.customer.name}</p>
-                <p className="text-sm text-gray-500">{approval.newData.customer.address}</p>
-                <p className="text-sm text-gray-500">Tel: {approval.newData.customer.phone}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Tarih</p>
-                <p>{new Date(approval.date).toLocaleDateString('tr-TR')}</p>
-                <p className="text-sm text-gray-500 mt-2">Sipariş No</p>
-                <p>{approval.newData.id}</p>
-              </div>
-            </div>
-
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left">Ürün</th>
-                  <th className="text-center">İstenen</th>
-                  <th className="text-center">Yeni</th>
-                  <th className="text-right">Birim Fiyat</th>
-                  <th className="text-right">Yeni Toplam</th>
-                </tr>
-              </thead>
-              <tbody>
-                {approval.newData.items.map((item: any, index: number) => {
-                  const oldItem = approval.oldData.items.find((i: any) => i.productId === item.productId);
-                  return (
-                    <tr key={index} className="border-b">
-                      <td>{item.name}</td>
-                      <td className="text-center">{oldItem?.quantity}</td>
-                      <td className="text-center">{item.quantity}</td>
-                      <td className="text-right">{formatCurrency(item.price)}</td>
-                      <td className="text-right">{formatCurrency(item.price * item.quantity)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="font-bold">
-                  <td colSpan={4} className="text-right">Eski Toplam</td>
-                  <td className="text-right">{formatCurrency(approval.oldData.totalAmount)}</td>
-                </tr>
-                <tr className="font-bold">
-                  <td colSpan={4} className="text-right">Yeni Toplam</td>
-                  <td className="text-right">{formatCurrency(approval.newData.totalAmount)}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {approval.newData.note && (
-              <div>
-                <h3 className="font-medium mb-2">Not</h3>
-                <p className="text-sm text-gray-500">{approval.newData.note}</p>
-              </div>
-            )}
-          </div>
-        );
-
-      default:
-        return null;
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (!tabsRef.current) return;
+    
+    const scrollAmount = 200;
+    const container = tabsRef.current;
+    
+    if (direction === 'left') {
+      container.scrollLeft -= scrollAmount;
+    } else {
+      container.scrollLeft += scrollAmount;
     }
   };
 
@@ -177,45 +70,80 @@ export function ApprovalsPage() {
         <h1 className="text-2xl font-bold">Onay Bekleyenler</h1>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        {[
-          { id: 'all', label: 'Tümü', count: pendingCounts.all },
-          { id: 'sales', label: 'Satışlar', count: pendingCounts.sales },
-          { id: 'payments', label: 'Tahsilatlar', count: pendingCounts.payments },
-          { id: 'expenses', label: 'Tediyeler', count: pendingCounts.expenses },
-          { id: 'returns', label: 'İadeler', count: pendingCounts.returns },
-          { id: 'products', label: 'Ürün Değişiklikleri', count: pendingCounts.products },
-          { id: 'orders', label: 'Siparişler', count: pendingCounts.orders },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as TabType)}
-            className={cn(
-              'px-4 py-2 rounded-lg relative',
-              activeTab === tab.id
-                ? 'bg-primary-600 text-white'
-                : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
-            )}
-          >
-            {tab.label}
-            {tab.count > 0 && (
-              <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 mb-6 relative">
+        <button
+          onClick={() => handleScroll('left')}
+          className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm z-10"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        <div 
+          ref={tabsRef}
+          className="flex-1 overflow-x-auto scrollbar-hide"
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          <div className="flex gap-2 min-w-max px-2 py-1">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'px-4 py-2 rounded-lg relative whitespace-nowrap min-w-[120px]',
+                  activeTab === tab.id
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+                )}
+              >
+                {tab.label}
+                {pendingCounts[tab.id] > 0 && (
+                  <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center z-20">
+                    {pendingCounts[tab.id]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={() => handleScroll('right')}
+          className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm z-10"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
       </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Onay ara..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 h-10 rounded-lg border border-gray-200 dark:border-gray-700"
-        />
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Onay ara..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 h-10 rounded-lg border border-gray-200 dark:border-gray-700"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          {(['pending', 'approved', 'rejected'] as ApprovalStatus[]).map((status) => (
+            <button
+              key={status}
+              onClick={() => setSelectedStatus(status)}
+              className={cn(
+                'px-4 py-2 rounded-lg',
+                selectedStatus === status
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+              )}
+            >
+              {status === 'pending' ? 'Bekleyenler' :
+               status === 'approved' ? 'Onaylananlar' :
+               'Reddedilenler'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -263,7 +191,7 @@ export function ApprovalsPage() {
               )}
             </div>
 
-            {renderApprovalDetail(approval)}
+            <ApprovalDetail approval={approval} />
           </div>
         ))}
       </div>

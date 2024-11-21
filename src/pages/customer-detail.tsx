@@ -3,106 +3,55 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Phone, Mail, MapPin, Plus, CreditCard, ArrowLeft } from 'lucide-react';
 import { customers } from '../data/customers';
 import { useTransactions } from '../hooks/use-transactions';
+import { useOrders } from '../hooks/use-orders';
 import { formatCurrency } from '../lib/utils';
-import { Search } from 'lucide-react';
-import { TransactionPreview } from '../components/daily-report/transaction-preview';
-import { OrderPreview } from '../components/orders/order-preview';
+import { cn } from '../lib/utils';
 
 export function CustomerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { transactions } = useTransactions();
-  const [activeTab, setActiveTab] = useState<'transactions' | 'orders' | 'products'>('transactions');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const { transactions, getCustomerTransactions, getCustomerStats, getCustomerBalance } = useTransactions();
+  const { getOrdersByCustomer } = useOrders();
+  const [activeTab, setActiveTab] = useState<'transactions' | 'orders' | 'products' | 'turnover'>('transactions');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const customer = customers.find(c => c.id === id);
   if (!customer) return null;
 
-  const customerTransactions = transactions.filter(t => t.customer.id === id);
+  const customerTransactions = getCustomerTransactions(id, selectedYear);
+  const customerOrders = getOrdersByCustomer(customer.id);
+  const balance = getCustomerBalance(customer.id);
+  const stats = getCustomerStats(customer.id);
 
-  // Calculate total balance
-  const balance = customerTransactions.reduce((sum, transaction) => {
-    if (transaction.type === 'sale') return sum - transaction.amount;
-    if (transaction.type === 'payment') return sum + transaction.amount;
-    return sum;
-  }, 0);
-
-  // Get all products purchased by customer
-  const purchasedProducts = customerTransactions
-    .filter(transaction => transaction.type === 'sale' && transaction.items)
-    .flatMap(transaction => {
-      const date = transaction.date;
-      return (transaction.items || []).map(item => ({
-        ...item,
-        date
-      }));
-    })
+  // Get sold products from transactions
+  const soldProducts = customerTransactions
+    .filter(t => t.type === 'sale' && t.items)
+    .flatMap(t => t.items || [])
     .reduce((acc, item) => {
       const existing = acc.find(p => p.productId === item.productId);
       if (existing) {
-        existing.purchases.push({
-          date: item.date,
-          quantity: item.quantity,
-          price: item.price
-        });
+        existing.quantity += item.quantity;
+        existing.total += item.price * item.quantity;
       } else {
         acc.push({
           productId: item.productId,
           name: item.name,
-          purchases: [{
-            date: item.date,
-            quantity: item.quantity,
-            price: item.price
-          }]
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity
         });
       }
       return acc;
     }, [] as Array<{
       productId: string;
       name: string;
-      purchases: Array<{
-        date: string;
-        quantity: number;
-        price: number;
-      }>;
+      quantity: number;
+      price: number;
+      total: number;
     }>);
-
-  const filteredProducts = purchasedProducts.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.productId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handlePrint = (content: string) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Detay</title>
-          <style>
-            body { font-family: system-ui, -apple-system, sans-serif; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-            @media print {
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          ${content}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="px-4 py-6">
           <button
@@ -161,47 +110,71 @@ export function CustomerDetailPage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="px-4">
           <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setActiveTab('transactions')}
-              className={`px-4 py-2 font-medium ${
+              className={cn(
+                'px-4 py-2 font-medium',
                 activeTab === 'transactions'
                   ? 'text-primary-600 border-b-2 border-primary-600'
                   : 'text-gray-500 dark:text-gray-400'
-              }`}
+              )}
             >
               Hesap Hareketleri
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`px-4 py-2 font-medium ${
+              className={cn(
+                'px-4 py-2 font-medium',
                 activeTab === 'orders'
                   ? 'text-primary-600 border-b-2 border-primary-600'
                   : 'text-gray-500 dark:text-gray-400'
-              }`}
+              )}
             >
               Siparişler
             </button>
             <button
               onClick={() => setActiveTab('products')}
-              className={`px-4 py-2 font-medium ${
+              className={cn(
+                'px-4 py-2 font-medium',
                 activeTab === 'products'
                   ? 'text-primary-600 border-b-2 border-primary-600'
                   : 'text-gray-500 dark:text-gray-400'
-              }`}
+              )}
             >
               Satılanlar
+            </button>
+            <button
+              onClick={() => setActiveTab('turnover')}
+              className={cn(
+                'px-4 py-2 font-medium',
+                activeTab === 'turnover'
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-500 dark:text-gray-400'
+              )}
+            >
+              Ciro
             </button>
           </div>
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4">
         {activeTab === 'transactions' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -210,28 +183,29 @@ export function CustomerDetailPage() {
                     <th className="text-left p-4">İşlem</th>
                     <th className="text-left p-4">Açıklama</th>
                     <th className="text-right p-4">Tutar</th>
+                    <th className="text-right p-4">Bakiye</th>
                   </tr>
                 </thead>
                 <tbody>
                   {customerTransactions.map((transaction) => (
-                    <tr 
-                      key={transaction.id} 
-                      onClick={() => setSelectedTransaction(transaction)}
-                      className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                    >
+                    <tr key={transaction.id} className="border-b border-gray-200 dark:border-gray-700">
                       <td className="p-4">
                         {new Date(transaction.date).toLocaleDateString('tr-TR')}
                       </td>
                       <td className="p-4 capitalize">
                         {transaction.type === 'sale' ? 'Satış' :
-                         transaction.type === 'payment' ? 'Tahsilat' : 'Tediye'}
+                         transaction.type === 'payment' ? 'Tahsilat' :
+                         transaction.type === 'return' ? 'İade' : 'Tediye'}
                       </td>
                       <td className="p-4">{transaction.description}</td>
                       <td className={`p-4 text-right ${
-                        transaction.type === 'payment' ? 'text-green-500' : 'text-red-500'
+                        transaction.type === 'payment' || transaction.type === 'return' ? 'text-green-500' : 'text-red-500'
                       }`}>
-                        {transaction.type === 'payment' ? '+' : '-'}
+                        {transaction.type === 'payment' || transaction.type === 'return' ? '+' : '-'}
                         {formatCurrency(Math.abs(transaction.amount))}
+                      </td>
+                      <td className="p-4 text-right">
+                        {formatCurrency(transaction.amount)}
                       </td>
                     </tr>
                   ))}
@@ -242,113 +216,107 @@ export function CustomerDetailPage() {
         )}
 
         {activeTab === 'orders' && (
-          <div className="space-y-4">
-            {customerTransactions
-              .filter(t => t.type === 'sale')
-              .map((order) => (
-                <div
-                  key={order.id}
-                  onClick={() => setSelectedOrder(order)}
-                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Sipariş #{order.id}</p>
-                      <p className="text-sm text-gray-500">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left p-4">Sipariş No</th>
+                    <th className="text-left p-4">Tarih</th>
+                    <th className="text-center p-4">Durum</th>
+                    <th className="text-right p-4">Tutar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customerOrders.map((order) => (
+                    <tr key={order.id} className="border-b border-gray-200 dark:border-gray-700">
+                      <td className="p-4">{order.id}</td>
+                      <td className="p-4">
                         {new Date(order.date).toLocaleDateString('tr-TR')}
-                      </p>
-                    </div>
-                    <p className="text-lg font-bold">{formatCurrency(order.amount)}</p>
-                  </div>
-                  
-                  {order.items && (
-                    <div className="space-y-2">
-                      {order.items.map((item, index) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span className="text-gray-600 dark:text-gray-300">
-                            {item.name} × {item.quantity}
-                          </span>
-                          <span className="text-gray-900 dark:text-white">
-                            {formatCurrency(item.price * item.quantity)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className={cn(
+                          'px-2 py-1 rounded-full text-xs',
+                          order.status === 'preparing' ? 'bg-yellow-100 text-yellow-800' :
+                          order.status === 'checking' ? 'bg-blue-100 text-blue-800' :
+                          order.status === 'loading' ? 'bg-purple-100 text-purple-800' :
+                          order.status === 'ready' ? 'bg-orange-100 text-orange-800' :
+                          'bg-green-100 text-green-800'
+                        )}>
+                          {order.status === 'preparing' ? 'Hazırlanıyor' :
+                           order.status === 'checking' ? 'Kontrol Ediliyor' :
+                           order.status === 'loading' ? 'Yükleniyor' :
+                           order.status === 'ready' ? 'Teslime Hazır' :
+                           'Teslim Edildi'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">{formatCurrency(order.totalAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {activeTab === 'products' && (
-          <>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Ürün ara..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left p-4">Tarih</th>
-                      <th className="text-left p-4">Ürün Kodu</th>
-                      <th className="text-left p-4">Ürün Adı</th>
-                      <th className="text-right p-4">Adet</th>
-                      <th className="text-right p-4">Birim Fiyat</th>
-                      <th className="text-right p-4">Toplam</th>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left p-4">Ürün</th>
+                    <th className="text-right p-4">Birim Fiyat</th>
+                    <th className="text-right p-4">Miktar</th>
+                    <th className="text-right p-4">Toplam</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {soldProducts.map((product) => (
+                    <tr key={product.productId} className="border-b border-gray-200 dark:border-gray-700">
+                      <td className="p-4">{product.name}</td>
+                      <td className="p-4 text-right">{formatCurrency(product.price)}</td>
+                      <td className="p-4 text-right">{product.quantity}</td>
+                      <td className="p-4 text-right">{formatCurrency(product.total)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProducts.flatMap(product =>
-                      product.purchases.map((purchase, index) => (
-                        <tr key={`${product.productId}-${index}`} className="border-b border-gray-200 dark:border-gray-700">
-                          <td className="p-4">{new Date(purchase.date).toLocaleDateString('tr-TR')}</td>
-                          <td className="p-4">{product.productId}</td>
-                          <td className="p-4">{product.name}</td>
-                          <td className="p-4 text-right">{purchase.quantity}</td>
-                          <td className="p-4 text-right">{formatCurrency(purchase.price)}</td>
-                          <td className="p-4 text-right">{formatCurrency(purchase.price * purchase.quantity)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'turnover' && (
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium mb-4">Satışlar</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-500">Bu Yıl</p>
+                  <p className="text-xl font-bold">{formatCurrency(stats.currentYearSales)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Geçen Yıl</p>
+                  <p className="text-xl font-bold">{formatCurrency(stats.lastYearSales)}</p>
+                </div>
               </div>
             </div>
-          </>
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium mb-4">Tahsilatlar</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-500">Bu Yıl</p>
+                  <p className="text-xl font-bold">{formatCurrency(stats.currentYearPayments)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Geçen Yıl</p>
+                  <p className="text-xl font-bold">{formatCurrency(stats.lastYearPayments)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Transaction Preview */}
-      {selectedTransaction && (
-        <TransactionPreview
-          transaction={selectedTransaction}
-          onClose={() => setSelectedTransaction(null)}
-          onPrint={() => {
-            const content = document.getElementById('transaction-content');
-            if (content) handlePrint(content.innerHTML);
-          }}
-        />
-      )}
-
-      {/* Order Preview */}
-      {selectedOrder && (
-        <OrderPreview
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-          onPrint={() => {
-            const content = document.getElementById('order-content');
-            if (content) handlePrint(content.innerHTML);
-          }}
-        />
-      )}
     </div>
   );
 }

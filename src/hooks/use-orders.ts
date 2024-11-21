@@ -10,6 +10,7 @@ export type OrderItem = {
   price: number;
   quantity: number;
   collectedQuantity?: number;
+  note?: string;
 };
 
 export type Order = {
@@ -34,6 +35,12 @@ export type Order = {
   loadingEndDate?: string;
   deliveredBy?: string;
   deliveryDate?: string;
+  pendingApproval?: boolean;
+  routeId?: string;
+  routeName?: string;
+  routeDate?: string;
+  routeOrder?: number;
+  completedRouteDate?: string;
 };
 
 type OrdersState = {
@@ -42,8 +49,11 @@ type OrdersState = {
   updateOrder: (orderId: string, updates: Partial<Order>) => void;
   updateOrderItem: (orderId: string, productId: string, updates: Partial<OrderItem>) => void;
   getOrdersByStatus: (status: OrderStatus) => Order[];
+  getOrdersByCustomer: (customerId: string) => Order[];
   getOrderById: (id: string) => Order | undefined;
   getStatusCounts: () => Record<OrderStatus, number>;
+  setOrderPendingApproval: (orderId: string, pending: boolean) => void;
+  deleteOrder: (orderId: string) => void;
 };
 
 export const useOrders = create<OrdersState>()(
@@ -94,6 +104,10 @@ export const useOrders = create<OrdersState>()(
         return get().orders.filter((order) => order.status === status);
       },
 
+      getOrdersByCustomer: (customerId) => {
+        return get().orders.filter((order) => order.customer.id === customerId);
+      },
+
       getOrderById: (id) => {
         return get().orders.find((order) => order.id === id);
       },
@@ -107,6 +121,22 @@ export const useOrders = create<OrdersState>()(
           ready: orders.filter(o => o.status === 'ready').length,
           delivered: orders.filter(o => o.status === 'delivered').length,
         };
+      },
+
+      setOrderPendingApproval: (orderId, pending) => {
+        set((state) => ({
+          orders: state.orders.map((order) =>
+            order.id === orderId
+              ? { ...order, pendingApproval: pending }
+              : order
+          ),
+        }));
+      },
+
+      deleteOrder: (orderId) => {
+        set((state) => ({
+          orders: state.orders.filter(order => order.id !== orderId)
+        }));
       },
     }),
     {

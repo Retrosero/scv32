@@ -44,6 +44,9 @@ export default {
       borderRadius: {
         DEFAULT: '8px',
       },
+      fontSize: {
+        'responsive': 'clamp(0.875rem, 2vw, 1.5rem)',
+      },
     },
   },
   plugins: [],

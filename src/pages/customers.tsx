@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { customers } from '../data/customers';
 import { formatCurrency } from '../lib/utils';
 import { useCustomer } from '../hooks/use-customer';
+import { useTransactions } from '../hooks/use-transactions';
 
 export function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -13,6 +14,7 @@ export function CustomersPage() {
   });
   const navigate = useNavigate();
   const { setSelectedCustomer } = useCustomer();
+  const { getCustomerBalance } = useTransactions();
 
   useEffect(() => {
     localStorage.setItem('showCustomerBalances', JSON.stringify(showBalances));
@@ -76,63 +78,67 @@ export function CustomersPage() {
       </div>
 
       <div className="space-y-4">
-        {filteredCustomers.map((customer) => (
-          <div
-            key={customer.id}
-            onClick={() => handleCustomerClick(customer)}
-            className="bg-white dark:bg-gray-800 rounded-lg p-4 cursor-pointer border border-gray-200 dark:border-gray-700"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">{customer.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">#{customer.taxNumber}</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </div>
-
-            <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <Phone className="w-4 h-4" />
-                <span className="text-sm">{customer.phone}</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <Mail className="w-4 h-4" />
-                <span className="text-sm">{customer.email}</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <MapPin className="w-4 h-4" />
-                <span className="text-sm">{customer.address}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
-              {showBalances && (
+        {filteredCustomers.map((customer) => {
+          const balance = getCustomerBalance(customer.id);
+          
+          return (
+            <div
+              key={customer.id}
+              onClick={() => handleCustomerClick(customer)}
+              className="bg-white dark:bg-gray-800 rounded-lg p-4 cursor-pointer border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Bakiye</p>
-                  <p className={`text-lg font-medium ${customer.balance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {formatCurrency(customer.balance)}
-                  </p>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">{customer.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">#{customer.taxNumber}</p>
                 </div>
-              )}
-              <div className="flex gap-2 ml-auto">
-                <button
-                  onClick={(e) => handleSaleClick(customer, e)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Satış</span>
-                </button>
-                <button 
-                  onClick={(e) => handlePaymentClick(customer, e)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>Tahsilat</span>
-                </button>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
+              </div>
+
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <Phone className="w-4 h-4" />
+                  <span className="text-sm">{customer.phone}</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <Mail className="w-4 h-4" />
+                  <span className="text-sm">{customer.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-sm">{customer.address}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
+                {showBalances && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Bakiye</p>
+                    <p className={`text-lg font-medium ${balance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {formatCurrency(balance)}
+                    </p>
+                  </div>
+                )}
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    onClick={(e) => handleSaleClick(customer, e)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Satış</span>
+                  </button>
+                  <button 
+                    onClick={(e) => handlePaymentClick(customer, e)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Tahsilat</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

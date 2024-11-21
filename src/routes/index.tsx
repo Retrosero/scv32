@@ -16,6 +16,9 @@ import { InventoryListsPage } from '../pages/inventory/lists';
 import { CompletedInventoryPage } from '../pages/inventory/completed';
 import { OrdersPage } from '../pages/orders/index';
 import { OrderPreparationPage } from '../pages/orders/preparation';
+import { OrderRoutePage } from '../pages/orders/route';
+import { OrderDeliveryPage } from '../pages/orders/delivery';
+import { CompletedDeliveriesPage } from '../pages/orders/completed-deliveries';
 import { useAuth } from '../hooks/use-auth';
 
 export function AppRoutes() {
@@ -49,6 +52,9 @@ export function AppRoutes() {
         <Route path="/inventory/completed" element={<CompletedInventoryPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/preparation/:id" element={<OrderPreparationPage />} />
+        <Route path="/orders/route" element={<OrderRoutePage />} />
+        <Route path="/orders/delivery" element={<OrderDeliveryPage />} />
+        <Route path="/orders/completed-deliveries" element={<CompletedDeliveriesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

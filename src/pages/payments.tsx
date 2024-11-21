@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Search, Plus, CreditCard, Banknote, FileText, FileCheck } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, Plus, CreditCard, Banknote, FileText, FileCheck, Building } from 'lucide-react';
 import { useCustomer } from '../hooks/use-customer';
 import { CustomerSelector } from '../components/sales/customer-selector';
 import { CustomerInfo } from '../components/sales/customer-info';
@@ -11,10 +12,9 @@ import { useApprovals } from '../hooks/use-approvals';
 import { useTransactions } from '../hooks/use-transactions';
 import { useAuth } from '../hooks/use-auth';
 import { useSettings } from '../hooks/use-settings';
-import { useNavigate } from 'react-router-dom';
 
 type TabType = 'tahsilat' | 'tediye';
-type PaymentType = 'nakit' | 'krediKarti' | 'cek' | 'senet';
+type PaymentType = 'nakit' | 'krediKarti' | 'cek' | 'senet' | 'havale';
 
 export function PaymentsPage() {
   const navigate = useNavigate();
@@ -37,6 +37,7 @@ export function PaymentsPage() {
       data: {
         amount: '',
         ...(type === 'krediKarti' && { bank: '' }),
+        ...(type === 'havale' && { bank: '' }),
         ...(type === 'cek' && {
           bank: '',
           branch: '',
@@ -112,20 +113,34 @@ export function PaymentsPage() {
       setSelectedCustomer(null);
       navigate('/dashboard');
     } else {
+      // Add transaction to update customer balance and history
       addTransaction({
         type: selectedTab === 'tahsilat' ? 'payment' : 'expense',
         description: selectedTab === 'tahsilat' ? 'Tahsilat' : 'Tediye',
         customer: receipt.customer,
         amount: selectedTab === 'tahsilat' ? total : -total,
-        paymentMethod: payments.map(p => p.type).join(', '),
+        paymentMethod: payments.map(p => {
+          switch (p.type) {
+            case 'nakit': return 'Nakit';
+            case 'krediKarti': return `Kredi Kartı (${p.data.bank})`;
+            case 'cek': return `Çek (${p.data.bank} - ${p.data.checkNumber})`;
+            case 'senet': return `Senet (${p.data.bondNumber})`;
+            case 'havale': return `Havale (${p.data.bank})`;
+            default: return p.type;
+          }
+        }).join(', '),
         note,
         date: new Date().toISOString(),
       });
 
+      // Show receipt preview
+      setSavedReceipt(receipt);
+      setShowReceiptPreview(true);
+
+      // Reset form
       setPayments([]);
       setNote('');
       setSelectedCustomer(null);
-      navigate('/dashboard');
     }
   };
 
@@ -147,10 +162,10 @@ export function PaymentsPage() {
               <button
                 onClick={() => setSelectedTab('tahsilat')}
                 className={cn(
-                  'px-4 py-2 rounded-lg',
+                  'px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700',
                   selectedTab === 'tahsilat'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700'
+                    ? 'bg-primary-50 dark:bg-primary-900/50 text-primary-600 border-primary-600'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                 )}
               >
                 Tahsilat
@@ -158,10 +173,10 @@ export function PaymentsPage() {
               <button
                 onClick={() => setSelectedTab('tediye')}
                 className={cn(
-                  'px-4 py-2 rounded-lg',
+                  'px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700',
                   selectedTab === 'tediye'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700'
+                    ? 'bg-primary-50 dark:bg-primary-900/50 text-primary-600 border-primary-600'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                 )}
               >
                 Tediye
@@ -180,34 +195,41 @@ export function PaymentsPage() {
               ))}
             </div>
 
-            <div className="flex gap-2 mb-6">
+            <div className="flex gap-2 mb-6 overflow-x-auto py-2">
               <button
                 onClick={() => handleAddPayment('nakit')}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
               >
                 <Banknote className="w-5 h-5" />
                 <span>Nakit</span>
               </button>
               <button
                 onClick={() => handleAddPayment('krediKarti')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
               >
                 <CreditCard className="w-5 h-5" />
                 <span>Kredi Kartı</span>
               </button>
               <button
                 onClick={() => handleAddPayment('cek')}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
               >
                 <FileText className="w-5 h-5" />
                 <span>Çek</span>
               </button>
               <button
                 onClick={() => handleAddPayment('senet')}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
               >
                 <FileCheck className="w-5 h-5" />
                 <span>Senet</span>
+              </button>
+              <button
+                onClick={() => handleAddPayment('havale')}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+              >
+                <Building className="w-5 h-5" />
+                <span>Havale</span>
               </button>
             </div>
 
@@ -239,7 +261,10 @@ export function PaymentsPage() {
           {showReceiptPreview && savedReceipt && (
             <ReceiptPreview
               data={savedReceipt}
-              onClose={() => setShowReceiptPreview(false)}
+              onClose={() => {
+                setShowReceiptPreview(false);
+                navigate('/dashboard');
+              }}
               onPrint={() => {
                 const printContent = document.getElementById('receipt-content');
                 if (!printContent) return;
